@@ -64,8 +64,8 @@ impl <Word: Copy + 'static, Lut, SPI, const N: usize, const WORDS_PER_COLOR: usi
 where
     SPI: SpiBus<Word>,
     Lut: Ws2812SpiLookupTable,
-    Lut::Output: Copy +  Shl<u8, Output = Lut::Output> + Shr<u8, Output = Lut::Output> + NumBits,
-    Word: Copy + Default + TruncatedFrom<Lut::Output> + Shl<u8, Output = Word> + Shr<u8, Output = Word> + BitOr<Word, Output = Word> + NumBits + 'static,
+    Lut::Output: Copy + Shr<u8, Output = Lut::Output> + NumBits,
+    Word: Copy + Default + TruncatedFrom<Lut::Output> + Shl<u8, Output = Word> + BitOr<Word, Output = Word> + NumBits + 'static,
 {
     /// Creates a new instance given a SPI bus and lookup table defining how smartled bits are encoded into SPI bits.
     /// This requires the SPI driver to continuously transmit data, without inter-word gaps
@@ -143,8 +143,8 @@ for Ws2812SpiCustom<Word, Lut, SPI, N, WORDS_PER_COLOR>
 where
     SPI: SpiBus<Word>,
     Lut: Ws2812SpiLookupTable,
-    Lut::Output: Copy +  Shl<u8, Output = Lut::Output> + Shr<u8, Output = Lut::Output> + NumBits,
-    Word: Copy + Default + TruncatedFrom<Lut::Output> + Shl<u8, Output = Word> + Shr<u8, Output = Word> + BitOr<Word, Output = Word> + NumBits + 'static,
+    Lut::Output: Copy + Shr<u8, Output = Lut::Output> + NumBits,
+    Word: Copy + Default + TruncatedFrom<Lut::Output> + Shl<u8, Output = Word> + BitOr<Word, Output = Word> + NumBits + 'static,
 {
     type Error = SPI::Error;
     type Color = RGB8;
