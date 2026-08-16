@@ -1,8 +1,10 @@
 #![no_std]
 
 mod lut;
-use lut::{Ws2812SpiLookupTable};
-pub use lut::{OneBitWs2812LookupTable, MultiBitWs2812Lookup};
+use lut::{SmartLedsSpiData};
+pub use lut::{SmartLedsSpiBit, SmartLedsSpiLut};
+mod bits_traits;
+use bits_traits::{NumBits, TruncatedFrom};
 
 
 use core::ops::{BitOr, Shl, Shr};
@@ -13,57 +15,20 @@ use embedded_hal_async::spi::SpiBus;
 use smart_leds_trait::{SmartLedsWriteAsync, RGB8};
 
 
-pub trait NumBits {
-    const BITS: u8;
-}
-
-impl NumBits for u8 { const BITS: u8 = 8; }
-impl NumBits for u16 { const BITS: u8 = 16; }
-impl NumBits for u32 { const BITS: u8 = 32; }
-impl NumBits for u64 { const BITS: u8 = 64; }
-
-pub trait TruncatedFrom<T> {
-    fn truncated_from(value: T) -> Self;
-}
-
-impl<T> TruncatedFrom<T> for T {
-    fn truncated_from(value: T) -> Self {
-        value
-    }
-}
-
-impl TruncatedFrom<u32> for u8 {
-    fn truncated_from(value: u32) -> u8 {
-        value as u8
-    }
-}
-
-impl TruncatedFrom<u16> for u8 {
-    fn truncated_from(value: u16) -> u8 {
-        value as u8
-    }
-}
-
-impl TruncatedFrom<u32> for u16 {
-    fn truncated_from(value: u32) -> u16 {
-        value as u16
-    }
-}
-
 /// WS2812 LED driver with customizable SPI word size and bit encoding
 /// N is the maximum number of LEDs in the chain, for buffer sizing
 /// WORDS_PER_COLOR is the maximum number of SPI words used to encode a single color of LED data
 ///   This encoding is needed for internal array sizing without generic const exprs
-pub struct Ws2812SpiCustom<Word, Lut, SPI, const N: usize, const WORDS_PER_COLOR: usize> {
+pub struct SmartLedsSpi<Word, Lut, SPI, const N: usize, const WORDS_PER_COLOR: usize> {
     spi: SPI,
     lut: Lut,
     buffer: [[[Word; WORDS_PER_COLOR]; 3]; N],
 }
 
-impl <Word: Copy + 'static, Lut, SPI, const N: usize, const WORDS_PER_COLOR: usize> Ws2812SpiCustom<Word, Lut, SPI, N, WORDS_PER_COLOR> 
+impl <Word: Copy + 'static, Lut, SPI, const N: usize, const WORDS_PER_COLOR: usize> SmartLedsSpi<Word, Lut, SPI, N, WORDS_PER_COLOR> 
 where
     SPI: SpiBus<Word>,
-    Lut: Ws2812SpiLookupTable,
+    Lut: SmartLedsSpiData,
     Lut::Output: Copy + Shr<u8, Output = Lut::Output> + NumBits,
     Word: Copy + Default + TruncatedFrom<Lut::Output> + Shl<u8, Output = Word> + BitOr<Word, Output = Word> + NumBits + 'static,
 {
@@ -139,10 +104,10 @@ where
 }
 
 impl <Word, Lut, SPI, const N: usize, const WORDS_PER_COLOR: usize> SmartLedsWriteAsync
-for Ws2812SpiCustom<Word, Lut, SPI, N, WORDS_PER_COLOR> 
+for SmartLedsSpi<Word, Lut, SPI, N, WORDS_PER_COLOR> 
 where
     SPI: SpiBus<Word>,
-    Lut: Ws2812SpiLookupTable,
+    Lut: SmartLedsSpiData,
     Lut::Output: Copy + Shr<u8, Output = Lut::Output> + NumBits,
     Word: Copy + Default + TruncatedFrom<Lut::Output> + Shl<u8, Output = Word> + BitOr<Word, Output = Word> + NumBits + 'static,
 {

@@ -1,7 +1,7 @@
 use core::ops::{BitOr, Shl};
 
 
-pub trait Ws2812SpiLookupTable {
+pub trait SmartLedsSpiData {
     const INDEX_BITS: u8;  // number of bits this table indexes by
     type Output;  // return type
 
@@ -16,20 +16,20 @@ pub trait Ws2812SpiLookupTable {
 /// one, one_bits: same for a smartled one bit
 /// zero_bits, one_bits do not need to divide cleanly into a Word
 ///   the SPI buffer generation will build Words across smartled bit boundaries
-pub struct OneBitWs2812LookupTable {
+pub struct SmartLedsSpiBit {
     zero: u8,
     zero_bits: u8,
     one: u8,
     one_bits: u8
 }
 
-impl OneBitWs2812LookupTable {
+impl SmartLedsSpiBit {
     pub fn new(zero: u8, zero_bits: u8, one: u8, one_bits: u8) -> Self {
         Self { zero, zero_bits, one, one_bits }
     }
 }
 
-impl Ws2812SpiLookupTable for OneBitWs2812LookupTable {
+impl SmartLedsSpiData for SmartLedsSpiBit {
   const INDEX_BITS: u8 = 1;
   type Output = u8;
 
@@ -43,13 +43,13 @@ impl Ws2812SpiLookupTable for OneBitWs2812LookupTable {
 }
 
 
-pub struct MultiBitWs2812Lookup<T, const N: usize>
+pub struct SmartLedsSpiLut<T, const N: usize>
 {
     table: [T; N],
     bits: [u8; N],
 }
 
-impl <T, const N: usize> MultiBitWs2812Lookup<T, N>
+impl <T, const N: usize> SmartLedsSpiLut<T, N>
 where T: Copy + Default + Shl<u8, Output = T> + BitOr<T, Output = T>
 {
     const INDEX_MASK : u8 = (N as u8) - 1;
@@ -78,7 +78,7 @@ where T: Copy + Default + Shl<u8, Output = T> + BitOr<T, Output = T>
     }
 }
 
-impl <T, const N: usize> Ws2812SpiLookupTable for MultiBitWs2812Lookup<T, N> 
+impl <T, const N: usize> SmartLedsSpiData for SmartLedsSpiLut<T, N> 
 where T: Copy + Default + Shl<u8, Output = T> + BitOr<T, Output = T>
 {
   const INDEX_BITS: u8 = N.ilog2() as u8;
