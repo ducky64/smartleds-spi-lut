@@ -54,7 +54,6 @@ where
             assert!(Lut::Output::BITS >= Word::BITS, "Lut::Output must larger or equal to than Word");
         };
         
-        let index_mask = (1 << Lut::INDEX_BITS) - 1;
         let output_to_word_shift = Lut::Output::BITS - Word::BITS;
 
         let mut buffer_index = 0;  // of the current word being written
@@ -63,13 +62,12 @@ where
 
         for item in iterator {
             let item = item.into();
-            for color_byte in [item.g, item.r, item.b] {
-                let mut written_bits: u8 = 0;
-                while written_bits < 8 {
-                    let lut_index = (color_byte >> (8 - written_bits - Lut::INDEX_BITS)) & index_mask;
+            for mut color_byte in [item.g, item.r, item.b] {
+                for _ in 0..(8 / Lut::INDEX_BITS) {
+                    let lut_index = color_byte >> (8 - Lut::INDEX_BITS);
                     let (spi_data, spi_bits) = lut.get(lut_index);
-                    written_bits += Lut::INDEX_BITS;
-
+                    color_byte = color_byte << Lut::INDEX_BITS;  // shift to get the next bits to the MSbits
+                    
                     accumulator = accumulator | (spi_data >> accumulator_bits);
                     accumulator_bits += spi_bits;
                     let spi_leftover_bits = if accumulator_bits > Lut::Output::BITS { accumulator_bits - Lut::Output::BITS } else { 0 };
