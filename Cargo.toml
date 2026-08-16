@@ -1,0 +1,13 @@
+[package]
+name = "smartleds-spi-lut"
+description = "smart-leds-trait compatible driver using the SPI perpheral and optimized buffer generation with custom bit patterns and bit lengths"
+edition = "2021"
+version = "0.1.0"
+license = "Apache-2.0"
+
+[features]
+default = []
+
+[dependencies]
+embedded-hal-async = { version = "1.0" }
+smart-leds-trait = "0.3.0"
