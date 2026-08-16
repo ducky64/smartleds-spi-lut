@@ -1,4 +1,5 @@
 use core::ops::{BitOr, Shl};
+use crate::bits_traits::NumBits;
 
 
 pub trait SmartLedsSpiData {
@@ -6,6 +7,7 @@ pub trait SmartLedsSpiData {
     type Output;  // return type
 
     /// Given BITS of smartled bits, return the corresponding SPI word and number of SPI bits
+    /// Data must be MSbit aligned
     fn get(&self, value: u8) -> (Self::Output, u8);
 }
 
@@ -24,8 +26,9 @@ pub struct SmartLedsSpiBit {
 }
 
 impl SmartLedsSpiBit {
+    /// Creates a new one-bit lookup table, input data is LSbit aligned
     pub fn new(zero: u8, zero_bits: u8, one: u8, one_bits: u8) -> Self {
-        Self { zero, zero_bits, one, one_bits }
+        Self { zero: zero << (8 - zero_bits), zero_bits, one: one << (8 - one_bits), one_bits }
     }
 }
 
@@ -50,7 +53,7 @@ pub struct SmartLedsSpiLut<T, const N: usize>
 }
 
 impl <T, const N: usize> SmartLedsSpiLut<T, N>
-where T: Copy + Default + Shl<u8, Output = T> + BitOr<T, Output = T>
+where T: Copy + Default + Shl<u8, Output = T> + BitOr<T, Output = T> + NumBits
 {
     const INDEX_MASK : u8 = (N as u8) - 1;
 
@@ -70,7 +73,7 @@ where T: Copy + Default + Shl<u8, Output = T> + BitOr<T, Output = T>
                     bit_count += one_bits;
                 }
             }
-            table[entry] = value;
+            table[entry] = value << (T::BITS - bit_count);
             bits[entry] = bit_count;
         }
 
@@ -79,7 +82,7 @@ where T: Copy + Default + Shl<u8, Output = T> + BitOr<T, Output = T>
 }
 
 impl <T, const N: usize> SmartLedsSpiData for SmartLedsSpiLut<T, N> 
-where T: Copy + Default + Shl<u8, Output = T> + BitOr<T, Output = T>
+where T: Copy + Default + Shl<u8, Output = T> + BitOr<T, Output = T> + NumBits
 {
   const INDEX_BITS: u8 = N.ilog2() as u8;
   type Output = T;

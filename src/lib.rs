@@ -29,7 +29,7 @@ impl <Word: Copy + 'static, Lut, SPI, const N: usize, const WORDS_PER_COLOR: usi
 where
     SPI: SpiBus<Word>,
     Lut: SmartLedsSpiData,
-    Lut::Output: Copy + Shr<u8, Output = Lut::Output> + NumBits,
+    Lut::Output: Copy + Default + BitOr<Lut::Output, Output = Lut::Output> + Shr<u8, Output = Lut::Output> + Shl<u8, Output = Lut::Output> + NumBits,
     Word: Copy + Default + TruncatedFrom<Lut::Output> + Shl<u8, Output = Word> + BitOr<Word, Output = Word> + NumBits + 'static,
 {
     /// Creates a new instance given a SPI bus and lookup table defining how smartled bits are encoded into SPI bits.
@@ -55,47 +55,46 @@ where
         };
         
         let index_mask = (1 << Lut::INDEX_BITS) - 1;
+        let output_to_word_shift = Lut::Output::BITS - Word::BITS;
 
         let mut buffer_index = 0;  // of the current word being written
-        let mut word_buffer: Word = Word::default();  // accumulates SPI bits per word, LSbit aligned
-        let mut word_bits = 0;  // number of bits written into word_buffer
+        let mut accumulator: Lut::Output = Lut::Output::default();  // current SPI data being built, MSbit aligned
+        let mut accumulator_bits = 0;  // number of bits written into accumulator
 
         for item in iterator {
             let item = item.into();
             for color_byte in [item.g, item.r, item.b] {
                 let mut written_bits: u8 = 0;
                 while written_bits < 8 {
-                  let lut_index = (color_byte >> (8 - written_bits - Lut::INDEX_BITS)) & index_mask;
-                  let (spi_data, mut spi_bits) = lut.get(lut_index);
-                  written_bits += Lut::INDEX_BITS;
+                    let lut_index = (color_byte >> (8 - written_bits - Lut::INDEX_BITS)) & index_mask;
+                    let (spi_data, spi_bits) = lut.get(lut_index);
+                    written_bits += Lut::INDEX_BITS;
 
-                  // spi_data is shifted into word_buffer MSbit first
-                  // spi_bits tracks the most significant valid bit in spi_data
-                  while spi_bits > 0 {
-                      let shift_bits = min(spi_bits, Word::BITS - word_bits);
-                      if shift_bits < Word::BITS {
-                          word_buffer = (word_buffer << shift_bits) | Word::truncated_from(spi_data >> (spi_bits - shift_bits));
-                      } else {  // a full shift panics
-                          word_buffer = Word::truncated_from(spi_data >> (spi_bits - shift_bits));
-                      }
-                      
-                      word_bits += shift_bits;
-                      spi_bits -= shift_bits;
+                    accumulator = accumulator | (spi_data >> accumulator_bits);
+                    accumulator_bits += spi_bits;
+                    let spi_leftover_bits = if accumulator_bits > Lut::Output::BITS { accumulator_bits - Lut::Output::BITS } else { 0 };
+                    while (accumulator_bits - spi_leftover_bits) >= Word::BITS {
+                        buffer[buffer_index] = Word::truncated_from(accumulator >> output_to_word_shift);
+                        buffer_index += 1;
+                        accumulator = accumulator << Word::BITS;
+                        accumulator_bits -= Word::BITS;
+                    }
 
-                      if word_bits >= Word::BITS {
-                          buffer[buffer_index] = word_buffer;
-                          buffer_index += 1;
-                          word_buffer = Word::default();
-                          word_bits = 0;
-                      }
-                  }
+                    accumulator = accumulator | (spi_data << (spi_bits - spi_leftover_bits) >> accumulator_bits);
                 }
             }
         }
 
+        while accumulator_bits >= Word::BITS {
+            buffer[buffer_index] = Word::truncated_from(accumulator >> output_to_word_shift);
+            buffer_index += 1;
+            accumulator = accumulator << Word::BITS;
+            accumulator_bits -= Word::BITS;
+        }
+
         // shift any leftover bits in the last word
-        if word_bits > 0 {
-            buffer[buffer_index] = word_buffer << (Word::BITS - word_bits);
+        if accumulator_bits > 0 {
+            buffer[buffer_index] = Word::truncated_from(accumulator >> output_to_word_shift);
             buffer_index += 1;
         }
 
@@ -108,7 +107,7 @@ for SmartLedsSpi<Word, Lut, SPI, N, WORDS_PER_COLOR>
 where
     SPI: SpiBus<Word>,
     Lut: SmartLedsSpiData,
-    Lut::Output: Copy + Shr<u8, Output = Lut::Output> + NumBits,
+    Lut::Output: Copy + Default + BitOr<Lut::Output, Output = Lut::Output> + Shr<u8, Output = Lut::Output> + Shl<u8, Output = Lut::Output> + NumBits,
     Word: Copy + Default + TruncatedFrom<Lut::Output> + Shl<u8, Output = Word> + BitOr<Word, Output = Word> + NumBits + 'static,
 {
     type Error = SPI::Error;
