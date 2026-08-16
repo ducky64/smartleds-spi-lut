@@ -6,9 +6,7 @@ pub use lut::{SmartLedsSpiBit, SmartLedsSpiLut};
 mod bits_traits;
 use bits_traits::{NumBits, TruncatedFrom};
 
-
 use core::ops::{BitOr, Shl, Shr};
-use core::cmp::min;
 
 use embedded_hal_async::spi::SpiBus;
 
@@ -30,7 +28,7 @@ where
     SPI: SpiBus<Word>,
     Lut: SmartLedsSpiData,
     Lut::Output: Copy + Default + BitOr<Lut::Output, Output = Lut::Output> + Shr<u8, Output = Lut::Output> + Shl<u8, Output = Lut::Output> + NumBits,
-    Word: Copy + Default + TruncatedFrom<Lut::Output> + Shl<u8, Output = Word> + BitOr<Word, Output = Word> + NumBits + 'static,
+    Word: Copy + Default + TruncatedFrom<Lut::Output> + NumBits + 'static,
 {
     /// Creates a new instance given a SPI bus and lookup table defining how smartled bits are encoded into SPI bits.
     /// This requires the SPI driver to continuously transmit data, without inter-word gaps
@@ -67,7 +65,7 @@ where
                     let lut_index = color_byte >> (8 - Lut::INDEX_BITS);
                     let (spi_data, spi_bits) = lut.get(lut_index);
                     color_byte = color_byte << Lut::INDEX_BITS;  // shift to get the next bits to the MSbits
-                    
+
                     accumulator = accumulator | (spi_data >> accumulator_bits);
                     accumulator_bits += spi_bits;
                     let spi_leftover_bits = if accumulator_bits > Lut::Output::BITS { accumulator_bits - Lut::Output::BITS } else { 0 };
@@ -106,7 +104,7 @@ where
     SPI: SpiBus<Word>,
     Lut: SmartLedsSpiData,
     Lut::Output: Copy + Default + BitOr<Lut::Output, Output = Lut::Output> + Shr<u8, Output = Lut::Output> + Shl<u8, Output = Lut::Output> + NumBits,
-    Word: Copy + Default + TruncatedFrom<Lut::Output> + Shl<u8, Output = Word> + BitOr<Word, Output = Word> + NumBits + 'static,
+    Word: Copy + Default + TruncatedFrom<Lut::Output> + NumBits + 'static,
 {
     type Error = SPI::Error;
     type Color = RGB8;
