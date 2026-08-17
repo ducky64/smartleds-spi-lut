@@ -50,7 +50,7 @@ pub struct SmartLedsSpiLut<T, const N: usize>
 
 impl <T, const N: usize> SmartLedsSpiLut<T, N>
 {
-    const INDEX_MASK : u8 = (N as u8) - 1;
+    const INDEX_MASK : u8 = (N - 1) as u8;
 }
 
 macro_rules! impl_lut_table {
@@ -98,5 +98,4 @@ where T: Copy
   }
 }
 
-// impl_lut_table!(u8, u16, u32, u64, u128, usize);
-impl_lut_table!(u16);
+impl_lut_table!(u8, u16, u32, u64, u128);
