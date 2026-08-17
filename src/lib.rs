@@ -67,16 +67,21 @@ where
                     color_byte = color_byte << Lut::INDEX_BITS;  // shift to get the next bits to the MSbits
 
                     accumulator = accumulator | (spi_data >> accumulator_bits);
-                    accumulator_bits += spi_bits;
-                    let spi_leftover_bits = if accumulator_bits > Lut::Output::BITS { accumulator_bits - Lut::Output::BITS } else { 0 };
-                    while (accumulator_bits - spi_leftover_bits) >= Word::BITS {
+                    let (new_accumulator_bits, spi_leftover_data, spi_leftover_bits) = if (spi_bits + accumulator_bits) >= Lut::Output::BITS {
+                        (Lut::Output::BITS, spi_data << (Lut::Output::BITS - accumulator_bits), accumulator_bits + spi_bits - Lut::Output::BITS)
+                    } else {
+                        (spi_bits + accumulator_bits, Lut::Output::default(), 0)
+                    };
+                    accumulator_bits = new_accumulator_bits;
+                    while accumulator_bits >= Word::BITS {
                         buffer[buffer_index] = Word::truncated_from(accumulator >> output_to_word_shift);
                         buffer_index += 1;
                         accumulator = accumulator << Word::BITS;
                         accumulator_bits -= Word::BITS;
                     }
 
-                    accumulator = accumulator | (spi_data << (spi_bits - spi_leftover_bits) >> accumulator_bits);
+                    accumulator = accumulator | (spi_leftover_data >> accumulator_bits);
+                    accumulator_bits += spi_leftover_bits;
                 }
             }
         }
