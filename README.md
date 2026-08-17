@@ -8,6 +8,9 @@ LUT entries count must be a power of 2 and the index bitcount must evenly divide
 The LUT can be constructed with custom bit patterns to support different SPI peripherals and clocks.
 Bit patterns can be of arbitrary length, the example has different lengths for the zero and one pattern and is compliant with datasheet timing requirements.
 
+If bit patterns do not cleanly pack into a SPI word, this requires the SPI peripherals shift out words without inter-word delays.
+This is probably the case when using a DMA-backed async driver.
+
 ## Example
 
 ```rust
