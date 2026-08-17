@@ -99,3 +99,27 @@ where T: Copy
 }
 
 impl_lut_table!(u8, u16, u32, u64, u128);
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lut_2bit() {
+        let lut = SmartLedsSpiLut::<u8, 4>::new(0b100, 3, 0b1100, 4);
+
+        assert_eq!(lut.get(0b00), (0b100_100_00, 6));
+        assert_eq!(lut.get(0b01), (0b100_1100_0, 7));
+        assert_eq!(lut.get(0b10), (0b1100_100_0, 7));
+        assert_eq!(lut.get(0b11), (0b1100_1100, 8));
+        
+    }
+
+    #[test]
+    fn test_compile_time_const_evaluation() {
+        pub static CONST_LUT: SmartLedsSpiLut<u8, 4> =
+            SmartLedsSpiLut::<u8, 4>::new(0b100, 3, 0b1100, 4);
+        assert_eq!(CONST_LUT.get(0b10), (0b1100_100_0, 7));
+    }
+}
