@@ -181,6 +181,28 @@ mod tests {
         assert_eq!(buffer[8], 0b00_100_100);
     }
 
+    #[test]
+    fn test_buffer_1bit() {
+        let lut = SmartLedsSpiBit::new(0b100, 3, 0b1100, 4);
+        let rgb = [RGB8 { r: 0b00_00_00_00, g: 0b00_00_00_00, b: 0b00_00_00_10 }];
+        let mut buffer = [0u8; 12];
+        let words = write_buffer(&lut, rgb, &mut buffer);
+
+        assert_eq!(words, 10);
+
+        assert_eq!(buffer[0], 0b100_100_10);
+        assert_eq!(buffer[1], 0b0_100_100_1);
+        assert_eq!(buffer[2], 0b00_100_100);
+
+        assert_eq!(buffer[3], 0b100_100_10);
+        assert_eq!(buffer[4], 0b0_100_100_1);
+        assert_eq!(buffer[5], 0b00_100_100);
+
+        assert_eq!(buffer[6], 0b100_100_10);
+        assert_eq!(buffer[7], 0b0_100_100_1);
+        assert_eq!(buffer[8], 0b00_1100_10);
+        assert_eq!(buffer[9], 0b0_0000000);
+    }
 
     #[test]
     fn test_buffer_mixed_4bit() {
