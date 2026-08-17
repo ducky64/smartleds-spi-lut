@@ -1,4 +1,4 @@
-# smartleds-spi-lut-async
+# smartleds-spi-lut
 smart-leds-trait compatible driver using the SPI perpheral and optimized buffer generation with custom bit patterns and bit lengths
 
 This generates a `const` lookup table (LUT) mapping smartled bits to SPI words, allowing it to efficiently turn smartled colors into SPI buffer data.
