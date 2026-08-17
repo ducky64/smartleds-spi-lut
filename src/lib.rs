@@ -134,8 +134,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_buffer_2bit() {
+    fn test_buffer_zeros_2bit() {
         let lut = SmartLedsSpiLut::<u16, 4>::new(0b100, 3, 0b1100, 4);
+        let rgb = [RGB8 { r: 0b00_00_00_00, g: 0b00_00_00_00, b: 0b00_00_00_00 }];
+        let mut buffer = [0u8; 12];
+        let words = write_buffer(&lut, rgb, &mut buffer);
+
+        assert_eq!(words, 9);
+
+        assert_eq!(buffer[0], 0b100_100_10);
+        assert_eq!(buffer[1], 0b0_100_100_1);
+        assert_eq!(buffer[2], 0b00_100_100);
+
+        assert_eq!(buffer[3], 0b100_100_10);
+        assert_eq!(buffer[4], 0b0_100_100_1);
+        assert_eq!(buffer[5], 0b00_100_100);
+
+        assert_eq!(buffer[6], 0b100_100_10);
+        assert_eq!(buffer[7], 0b0_100_100_1);
+        assert_eq!(buffer[8], 0b00_100_100);
+    }
+
+    #[test]
+    fn test_buffer_zeros_4bit() {
+        let lut = SmartLedsSpiLut::<u16,16>::new(0b100, 3, 0b1100, 4);
         let rgb = [RGB8 { r: 0b00_00_00_00, g: 0b00_00_00_00, b: 0b00_00_00_00 }];
         let mut buffer = [0u8; 12];
         let words = write_buffer(&lut, rgb, &mut buffer);

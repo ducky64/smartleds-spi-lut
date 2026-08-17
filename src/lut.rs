@@ -119,6 +119,17 @@ mod tests {
     fn test_compile_time_const_evaluation() {
         pub static CONST_LUT: SmartLedsSpiLut<u8, 4> =
             SmartLedsSpiLut::<u8, 4>::new(0b100, 3, 0b1100, 4);
+            
         assert_eq!(CONST_LUT.get(0b10), (0b1100_100_0, 7));
+    }
+
+    #[test]
+    fn test_lut_4bit() {
+        let lut = SmartLedsSpiLut::<u16, 16>::new(0b100, 3, 0b1100, 4);
+
+        assert_eq!(lut.get(0b0000), (0b100_100_100_100_0000, 12));
+        assert_eq!(lut.get(0b0110), (0b100_1100_1100_100_00, 14));
+        assert_eq!(lut.get(0b1010), (0b1100_100_1100_100_00, 14));
+        assert_eq!(lut.get(0b1111), (0b1100_1100_1100_1100, 16));
     }
 }
