@@ -113,7 +113,6 @@ mod tests {
         assert_eq!(lut.get(0b01), (0b100_1100_0, 7));
         assert_eq!(lut.get(0b10), (0b1100_100_0, 7));
         assert_eq!(lut.get(0b11), (0b1100_1100, 8));
-        
     }
 
     #[test]
