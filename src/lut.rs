@@ -1,7 +1,3 @@
-use core::ops::{BitOr, Shl};
-use crate::bits_traits::NumBits;
-
-
 pub trait SmartLedsSpiData {
     const INDEX_BITS: u8;  // number of bits this table indexes by
     type Output;  // return type
@@ -53,36 +49,46 @@ pub struct SmartLedsSpiLut<T, const N: usize>
 }
 
 impl <T, const N: usize> SmartLedsSpiLut<T, N>
-where T: Copy + Default + Shl<u8, Output = T> + BitOr<T, Output = T> + NumBits
 {
     const INDEX_MASK : u8 = (N as u8) - 1;
+}
 
-    pub fn new(zero: T, zero_bits: u8, one: T, one_bits: u8) -> Self {
-        let mut table: [T; N] = [T::default(); N];
-        let mut bits: [u8; N] = [0; N];
+macro_rules! impl_lut_table {
+    ($($ty:ty),*) => { $(
+        impl <const N: usize> SmartLedsSpiLut<$ty, N>
+        {
+            pub const fn new(zero: $ty, zero_bits: u8, one: $ty, one_bits: u8) -> Self {
+                let mut table: [$ty; N] = [0; N];
+                let mut bits: [u8; N] = [0; N];
+                let mut entry: usize = 0;
+                while entry < N {
+                    let mut value: $ty = 0;
+                    let mut bit_count: u8 = 0;
+                    let mut bit = Self::INDEX_BITS;
+                    while bit > 0 {
+                        bit -= 1;
+                        if entry & (1 << bit) == 0 {
+                            value = (value << zero_bits) | zero;
+                            bit_count += zero_bits;
+                        } else {
+                            value = (value << one_bits) | one;
+                            bit_count += one_bits;
+                        }
+                    }
+                    table[entry] = value << (<$ty>::BITS as u8 - bit_count);
+                    bits[entry] = bit_count;
 
-        for entry in 0..N {
-            let mut value: T = T::default();
-            let mut bit_count: u8 = 0;
-            for bit in (0..Self::INDEX_BITS).rev() {
-                if entry & (1 << bit) == 0 {
-                    value = (value << zero_bits) | zero;
-                    bit_count += zero_bits;
-                } else {
-                    value = (value << one_bits) | one;
-                    bit_count += one_bits;
+                    entry += 1;
                 }
-            }
-            table[entry] = value << (T::BITS - bit_count);
-            bits[entry] = bit_count;
-        }
 
-        Self { table, bits }
-    }
+                Self { table, bits }
+            }
+        }
+    )* }
 }
 
 impl <T, const N: usize> SmartLedsSpiData for SmartLedsSpiLut<T, N> 
-where T: Copy + Default + Shl<u8, Output = T> + BitOr<T, Output = T> + NumBits
+where T: Copy
 {
   const INDEX_BITS: u8 = N.ilog2() as u8;
   type Output = T;
@@ -91,3 +97,6 @@ where T: Copy + Default + Shl<u8, Output = T> + BitOr<T, Output = T> + NumBits
       (self.table[(value & Self::INDEX_MASK) as usize], self.bits[(value & Self::INDEX_MASK) as usize])
   }
 }
+
+// impl_lut_table!(u8, u16, u32, u64, u128, usize);
+impl_lut_table!(u16);
