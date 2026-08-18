@@ -4,9 +4,7 @@ mod lut;
 use lut::{SmartLedsSpiData};
 pub use lut::{SmartLedsSpiBit, SmartLedsSpiLut};
 mod bits_traits;
-use bits_traits::{NumBits, TruncatedFrom};
-
-use core::ops::{BitOr, Shl, Shr};
+use bits_traits::{NumBits, WordOps};
 
 use embedded_hal_async::spi::SpiBus;
 
@@ -17,65 +15,46 @@ use smart_leds_trait::{SmartLedsWriteAsync, RGB8};
 fn write_buffer<Word, Lut, T, I>(lut: &Lut, iterator: T, buffer: &mut [Word]) -> usize 
 where
     Lut: SmartLedsSpiData,
-    Lut::Output: Copy + Default + BitOr<Lut::Output, Output = Lut::Output> + Shr<u8, Output = Lut::Output> + Shl<u8, Output = Lut::Output> + NumBits,
-    Word: Copy + Default + TruncatedFrom<Lut::Output> + NumBits + 'static,
+    Lut::Output: WordOps + NumBits,
+    Word: Copy + Default + WordOps + NumBits + 'static,
     T: IntoIterator<Item = I>,
     I: Into<RGB8>
 {
     const {
         assert!(8 % Lut::INDEX_BITS == 0, "Lut::INDEX_BITS must divide from 8 (RGB8 component)");
         assert!(Lut::INDEX_BITS <= 8, "Lut::INDEX_BITS must be <= 8 (RGB8 component)");
-        assert!(Lut::Output::BITS >= Word::BITS, "Lut::Output must larger or equal to than Word");
+        assert!(Lut::Output::BITS <= 32/2, "Lut::Output must be <= half of accumulator size");
     };
     
-    let output_to_word_shift = Lut::Output::BITS - Word::BITS;
+    let accumulator_to_word_shift = 32 - Word::BITS;
 
     let mut buffer_index = 0;  // of the current word being written
-    let mut accumulator: Lut::Output = Lut::Output::default();  // current SPI data being built, MSbit aligned
-    let mut accumulator_bits = 0;  // number of bits written into accumulator
+    let mut accumulator: u32 = 0;  // current SPI data being built, MSbit aligned
+    let mut accumulator_bits: u8 = 0;  // number of bits written into accumulator
 
     for item in iterator {
         let item = item.into();
-        for mut color_byte in [item.g, item.r, item.b] {
-            for _ in 0..(8 / Lut::INDEX_BITS) {
-                let lut_index = color_byte >> (8 - Lut::INDEX_BITS);
-                let (spi_data, spi_bits) = lut.get(lut_index);
-                color_byte = color_byte << Lut::INDEX_BITS;  // shift to get the next bits to the MSbits
+        let mut color_data = (item.g as u32) << 16 | (item.r as u32) << 8 | (item.b as u32);
 
-                accumulator = accumulator | (spi_data >> accumulator_bits);
-                let (new_accumulator_bits, spi_leftover_data, spi_leftover_bits) = if (spi_bits + accumulator_bits) >= Lut::Output::BITS {
-                    (Lut::Output::BITS, spi_data << (Lut::Output::BITS - accumulator_bits), accumulator_bits + spi_bits - Lut::Output::BITS)
-                } else {
-                    (spi_bits + accumulator_bits, Lut::Output::default(), 0)
-                };
-                accumulator_bits = new_accumulator_bits;
-                while accumulator_bits >= Word::BITS {
-                    buffer[buffer_index] = Word::truncated_from(accumulator >> output_to_word_shift);
-                    buffer_index += 1;
-                    if Word::BITS == Lut::Output::BITS {  // clears accumulator, shifting entire word panics
-                        accumulator = Lut::Output::default();
-                    } else {
-                        accumulator = accumulator << Word::BITS;
-                    }
-                    accumulator_bits -= Word::BITS;
-                }
+        for _ in 0..(24 / Lut::INDEX_BITS) {
+            let lut_index = (color_data >> (24 - Lut::INDEX_BITS)) as u8;
+            let (spi_data, spi_bits) = lut.get(lut_index);
+            color_data = color_data << Lut::INDEX_BITS;  // shift to get the next bits to the MSbits
 
-                accumulator = accumulator | (spi_leftover_data >> accumulator_bits);
-                accumulator_bits += spi_leftover_bits;
+            accumulator = accumulator | (spi_data.to_u32() << (32 - spi_bits - accumulator_bits));
+            accumulator_bits += spi_bits;
+            while accumulator_bits >= Word::BITS {
+                buffer[buffer_index] = Word::truncate_from_u32(accumulator >> accumulator_to_word_shift);
+                buffer_index += 1;
+                accumulator = accumulator << Word::BITS;
+                accumulator_bits -= Word::BITS;
             }
         }
     }
 
-    while accumulator_bits >= Word::BITS {
-        buffer[buffer_index] = Word::truncated_from(accumulator >> output_to_word_shift);
-        buffer_index += 1;
-        accumulator = accumulator << Word::BITS;
-        accumulator_bits -= Word::BITS;
-    }
-
     // shift any leftover bits in the last word
     if accumulator_bits > 0 {
-        buffer[buffer_index] = Word::truncated_from(accumulator >> output_to_word_shift);
+        buffer[buffer_index] = Word::truncate_from_u32(accumulator >> accumulator_to_word_shift);
         buffer_index += 1;
     }
 
@@ -96,8 +75,8 @@ impl <Word: Copy + 'static, Lut, SPI, const N: usize, const WORDS_PER_COLOR: usi
 where
     SPI: SpiBus<Word>,
     Lut: SmartLedsSpiData,
-    Lut::Output: Copy + Default + BitOr<Lut::Output, Output = Lut::Output> + Shr<u8, Output = Lut::Output> + Shl<u8, Output = Lut::Output> + NumBits,
-    Word: Copy + Default + TruncatedFrom<Lut::Output> + NumBits + 'static,
+    Lut::Output: WordOps + NumBits,
+    Word: Copy + Default + WordOps + NumBits + 'static,
 {
     /// Creates a new instance given a SPI bus and lookup table defining how smartled bits are encoded into SPI bits.
     /// This requires the SPI driver to continuously transmit data, without inter-word gaps
@@ -115,8 +94,8 @@ for SmartLedsSpi<Word, Lut, SPI, N, WORDS_PER_COLOR>
 where
     SPI: SpiBus<Word>,
     Lut: SmartLedsSpiData,
-    Lut::Output: Copy + Default + BitOr<Lut::Output, Output = Lut::Output> + Shr<u8, Output = Lut::Output> + Shl<u8, Output = Lut::Output> + NumBits,
-    Word: Copy + Default + TruncatedFrom<Lut::Output> + NumBits + 'static,
+    Lut::Output: WordOps + NumBits,
+    Word: Copy + Default + WordOps + NumBits + 'static,
 {
     type Error = SPI::Error;
     type Color = RGB8;

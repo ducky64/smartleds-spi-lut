@@ -3,7 +3,7 @@ pub trait SmartLedsSpiData {
     type Output;  // return type
 
     /// Given BITS of smartled bits, return the corresponding SPI word and number of SPI bits
-    /// Data must be MSbit aligned
+    /// Data is LSbit aligned
     fn get(&self, value: u8) -> (Self::Output, u8);
 }
 
@@ -24,7 +24,7 @@ pub struct SmartLedsSpiBit {
 impl SmartLedsSpiBit {
     /// Creates a new one-bit lookup table, input data is LSbit aligned
     pub fn new(zero: u8, zero_bits: u8, one: u8, one_bits: u8) -> Self {
-        Self { zero: zero << (8 - zero_bits), zero_bits, one: one << (8 - one_bits), one_bits }
+        Self { zero: zero, zero_bits, one: one, one_bits }
     }
 }
 
@@ -75,7 +75,7 @@ macro_rules! impl_lut_table {
                             bit_count += one_bits;
                         }
                     }
-                    table[entry] = value << (<$ty>::BITS as u8 - bit_count);
+                    table[entry] = value;
                     bits[entry] = bit_count;
 
                     entry += 1;
@@ -109,9 +109,9 @@ mod tests {
     fn test_lut_2bit() {
         let lut = SmartLedsSpiLut::<u8, 4>::new(0b100, 3, 0b1100, 4);
 
-        assert_eq!(lut.get(0b00), (0b100_100_00, 6));
-        assert_eq!(lut.get(0b01), (0b100_1100_0, 7));
-        assert_eq!(lut.get(0b10), (0b1100_100_0, 7));
+        assert_eq!(lut.get(0b00), (0b100_100, 6));
+        assert_eq!(lut.get(0b01), (0b100_1100, 7));
+        assert_eq!(lut.get(0b10), (0b1100_100, 7));
         assert_eq!(lut.get(0b11), (0b1100_1100, 8));
     }
 
@@ -120,16 +120,16 @@ mod tests {
         pub static CONST_LUT: SmartLedsSpiLut<u8, 4> =
             SmartLedsSpiLut::<u8, 4>::new(0b100, 3, 0b1100, 4);
             
-        assert_eq!(CONST_LUT.get(0b10), (0b1100_100_0, 7));
+        assert_eq!(CONST_LUT.get(0b10), (0b1100_100, 7));
     }
 
     #[test]
     fn test_lut_4bit() {
         let lut = SmartLedsSpiLut::<u16, 16>::new(0b100, 3, 0b1100, 4);
 
-        assert_eq!(lut.get(0b0000), (0b100_100_100_100_0000, 12));
-        assert_eq!(lut.get(0b0110), (0b100_1100_1100_100_00, 14));
-        assert_eq!(lut.get(0b1010), (0b1100_100_1100_100_00, 14));
+        assert_eq!(lut.get(0b0000), (0b100_100_100_100, 12));
+        assert_eq!(lut.get(0b0110), (0b100_1100_1100_100, 14));
+        assert_eq!(lut.get(0b1010), (0b1100_100_1100_100, 14));
         assert_eq!(lut.get(0b1111), (0b1100_1100_1100_1100, 16));
     }
 }
