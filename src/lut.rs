@@ -1,10 +1,12 @@
+use crate::bits_traits::{WordOps, NumBits};
+
+
 pub trait SmartLedsSpiData {
     const INDEX_BITS: u8;  // number of bits this table indexes by
-    type Output;  // return type
 
     /// Given BITS of smartled bits, return the corresponding SPI word and number of SPI bits
-    /// Data is LSbit aligned
-    fn get(&self, value: u8) -> (Self::Output, u8);
+    /// Data is MSbit aligned
+    fn get(&self, value: u8) -> (u32, u8);
 }
 
 
@@ -24,19 +26,18 @@ pub struct SmartLedsSpiBit {
 impl SmartLedsSpiBit {
     /// Creates a new one-bit lookup table, input data is LSbit aligned
     pub fn new(zero: u8, zero_bits: u8, one: u8, one_bits: u8) -> Self {
-        Self { zero: zero, zero_bits, one: one, one_bits }
+        Self { zero: zero << (8 - zero_bits), zero_bits, one: one << (8 - one_bits), one_bits }
     }
 }
 
 impl SmartLedsSpiData for SmartLedsSpiBit {
   const INDEX_BITS: u8 = 1;
-  type Output = u8;
 
-  fn get(&self, value: u8) -> (Self::Output, u8) {
+  fn get(&self, value: u8) -> (u32, u8) {
       if value & 0x01 == 0 {
-          (self.zero, self.zero_bits)
+          ((self.zero as u32) << 24, self.zero_bits)
       } else {
-          (self.one, self.one_bits)
+          ((self.one as u32) << 24, self.one_bits)
       }
   }
 }
@@ -75,7 +76,7 @@ macro_rules! impl_lut_table {
                             bit_count += one_bits;
                         }
                     }
-                    table[entry] = value;
+                    table[entry] = value << ((<$ty>::BITS as u8) - bit_count);
                     bits[entry] = bit_count;
 
                     entry += 1;
@@ -88,17 +89,18 @@ macro_rules! impl_lut_table {
 }
 
 impl <T, const N: usize> SmartLedsSpiData for SmartLedsSpiLut<T, N> 
-where T: Copy
+where T: Copy + WordOps + NumBits
 {
-  const INDEX_BITS: u8 = N.ilog2() as u8;
-  type Output = T;
+    const INDEX_BITS: u8 = N.ilog2() as u8;
 
-  fn get(&self, value: u8) -> (Self::Output, u8) {
-      (self.table[(value & Self::INDEX_MASK) as usize], self.bits[(value & Self::INDEX_MASK) as usize])
+    fn get(&self, value: u8) -> (u32, u8) {
+        let index = (value & Self::INDEX_MASK) as usize;
+        (self.table[index].to_u32() << (32 - T::BITS), self.bits[index])
   }
 }
 
-impl_lut_table!(u8, u16, u32, u64, u128);
+// only support u8 and u16, to allow for lossless shifting in u32 accumulator
+impl_lut_table!(u8, u16);
 
 
 #[cfg(test)]
@@ -109,10 +111,10 @@ mod tests {
     fn test_lut_2bit() {
         let lut = SmartLedsSpiLut::<u8, 4>::new(0b100, 3, 0b1100, 4);
 
-        assert_eq!(lut.get(0b00), (0b100_100, 6));
-        assert_eq!(lut.get(0b01), (0b100_1100, 7));
-        assert_eq!(lut.get(0b10), (0b1100_100, 7));
-        assert_eq!(lut.get(0b11), (0b1100_1100, 8));
+        assert_eq!(lut.get(0b00), (0b100_100 << 26, 6));
+        assert_eq!(lut.get(0b01), (0b100_1100 << 25, 7));
+        assert_eq!(lut.get(0b10), (0b1100_100 << 25, 7));
+        assert_eq!(lut.get(0b11), (0b1100_1100 << 24, 8));
     }
 
     #[test]
@@ -120,16 +122,16 @@ mod tests {
         pub static CONST_LUT: SmartLedsSpiLut<u8, 4> =
             SmartLedsSpiLut::<u8, 4>::new(0b100, 3, 0b1100, 4);
             
-        assert_eq!(CONST_LUT.get(0b10), (0b1100_100, 7));
+        assert_eq!(CONST_LUT.get(0b10), (0b1100_100 << 25, 7));
     }
 
     #[test]
     fn test_lut_4bit() {
         let lut = SmartLedsSpiLut::<u16, 16>::new(0b100, 3, 0b1100, 4);
 
-        assert_eq!(lut.get(0b0000), (0b100_100_100_100, 12));
-        assert_eq!(lut.get(0b0110), (0b100_1100_1100_100, 14));
-        assert_eq!(lut.get(0b1010), (0b1100_100_1100_100, 14));
-        assert_eq!(lut.get(0b1111), (0b1100_1100_1100_1100, 16));
+        assert_eq!(lut.get(0b0000), (0b100_100_100_100 << 20, 12));
+        assert_eq!(lut.get(0b0110), (0b100_1100_1100_100 << 18, 14));
+        assert_eq!(lut.get(0b1010), (0b1100_100_1100_100 << 18, 14));
+        assert_eq!(lut.get(0b1111), (0b1100_1100_1100_1100 << 16, 16));
     }
 }

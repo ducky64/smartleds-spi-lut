@@ -12,10 +12,10 @@ use smart_leds_trait::{SmartLedsWriteAsync, RGB8};
 
 
 /// Write the colors to SPI bits in a buffer for transmission, returning the number of words.
+#[inline(never)]
 fn write_buffer<Word, Lut, T, I>(lut: &Lut, iterator: T, buffer: &mut [Word]) -> usize 
 where
     Lut: SmartLedsSpiData,
-    Lut::Output: WordOps + NumBits,
     Word: Copy + Default + WordOps + NumBits + 'static,
     T: IntoIterator<Item = I>,
     I: Into<RGB8>
@@ -23,7 +23,6 @@ where
     const {
         assert!(8 % Lut::INDEX_BITS == 0, "Lut::INDEX_BITS must divide from 8 (RGB8 component)");
         assert!(Lut::INDEX_BITS <= 8, "Lut::INDEX_BITS must be <= 8 (RGB8 component)");
-        assert!(Lut::Output::BITS <= 32/2, "Lut::Output must be <= half of accumulator size");
     };
     
     let accumulator_to_word_shift = 32 - Word::BITS;
@@ -41,7 +40,7 @@ where
             let (spi_data, spi_bits) = lut.get(lut_index);
             color_data = color_data << Lut::INDEX_BITS;  // shift to get the next bits to the MSbits
 
-            accumulator = accumulator | (spi_data.to_u32() << (32 - spi_bits - accumulator_bits));
+            accumulator = accumulator | (spi_data >> accumulator_bits);
             accumulator_bits += spi_bits;
             while accumulator_bits >= Word::BITS {
                 buffer[buffer_index] = Word::truncate_from_u32(accumulator >> accumulator_to_word_shift);
@@ -75,7 +74,6 @@ impl <Word: Copy + 'static, Lut, SPI, const N: usize, const WORDS_PER_COLOR: usi
 where
     SPI: SpiBus<Word>,
     Lut: SmartLedsSpiData,
-    Lut::Output: WordOps + NumBits,
     Word: Copy + Default + WordOps + NumBits + 'static,
 {
     /// Creates a new instance given a SPI bus and lookup table defining how smartled bits are encoded into SPI bits.
@@ -94,7 +92,6 @@ for SmartLedsSpi<Word, Lut, SPI, N, WORDS_PER_COLOR>
 where
     SPI: SpiBus<Word>,
     Lut: SmartLedsSpiData,
-    Lut::Output: WordOps + NumBits,
     Word: Copy + Default + WordOps + NumBits + 'static,
 {
     type Error = SPI::Error;
