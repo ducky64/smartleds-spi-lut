@@ -42,25 +42,25 @@ impl SmartLedsSpiData for SmartLedsSpiBit {
   }
 }
 
-
-pub struct SmartLedsSpiLut<T, const N: usize>
-{
-    table: [T; N],
-    bits: [u8; N],
+#[derive(Copy, Clone, Default)]
+pub struct LutEntry<T> {
+    pub value: T,
+    pub bit_count: u8,
 }
 
-impl <T, const N: usize> SmartLedsSpiLut<T, N>
-{
+pub struct SmartLedsSpiLut<T, const N: usize> {
+    table: [LutEntry<T>; N],
+}
+
+impl <T, const N: usize> SmartLedsSpiLut<T, N> {
     const INDEX_MASK : u32 = (N - 1) as u32;
 }
 
 macro_rules! impl_lut_table {
     ($($ty:ty),*) => { $(
-        impl <const N: usize> SmartLedsSpiLut<$ty, N>
-        {
+        impl <const N: usize> SmartLedsSpiLut<$ty, N> {
             pub const fn new(zero: $ty, zero_bits: u8, one: $ty, one_bits: u8) -> Self {
-                let mut table: [$ty; N] = [0; N];
-                let mut bits: [u8; N] = [0; N];
+                let mut table: [LutEntry<$ty>; N] = [LutEntry::<$ty> { value: 0, bit_count: 0 } ; N];
                 let mut entry: usize = 0;
                 while entry < N {
                     let mut value: $ty = 0;
@@ -76,13 +76,11 @@ macro_rules! impl_lut_table {
                             bit_count += one_bits;
                         }
                     }
-                    table[entry] = value << ((<$ty>::BITS as u8) - bit_count);
-                    bits[entry] = bit_count;
-
+                    table[entry] = LutEntry::<$ty> { value: value << ((<$ty>::BITS as u8) - bit_count), bit_count };
                     entry += 1;
                 }
 
-                Self { table, bits }
+                Self { table }
             }
         }
     )* }
@@ -95,7 +93,8 @@ where T: Copy + WordOps + NumBits
 
     fn get(&self, value: u32) -> (u32, u8) {
         let index = (value & Self::INDEX_MASK) as usize;
-        (self.table[index].to_u32() << (32 - T::BITS), self.bits[index])
+        let entry = &self.table[index];
+        (entry.value.to_u32() << (32 - T::BITS), entry.bit_count)
   }
 }
 
