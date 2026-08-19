@@ -27,7 +27,20 @@ where
     
     let accumulator_to_word_shift = 32 - Word::BITS;
 
-    let mut buffer_index = 0;  // of the current word being written
+    let start_ptr = buffer.as_mut_ptr();
+    let end_ptr = unsafe { start_ptr.add(buffer.len()) };
+    let mut ptr = start_ptr;
+
+    let mut push_word = |b: Word| {
+        if ptr >= end_ptr {
+            panic!("buffer overflow");
+        }
+        unsafe {
+            ptr.write(b);
+            ptr = ptr.add(1);
+        }
+    };
+
     let mut accumulator: u32 = 0;  // current SPI data being built, MSbit aligned
     let mut accumulator_bits: u8 = 0;  // number of bits written into accumulator
 
@@ -43,8 +56,7 @@ where
             accumulator = accumulator | (spi_data >> accumulator_bits);
             accumulator_bits += spi_bits;
             while accumulator_bits >= Word::BITS {
-                buffer[buffer_index] = Word::truncate_from_u32(accumulator >> accumulator_to_word_shift);
-                buffer_index += 1;
+                push_word(Word::truncate_from_u32(accumulator >> accumulator_to_word_shift));
                 accumulator = accumulator << Word::BITS;
                 accumulator_bits -= Word::BITS;
             }
@@ -53,11 +65,10 @@ where
 
     // shift any leftover bits in the last word
     if accumulator_bits > 0 {
-        buffer[buffer_index] = Word::truncate_from_u32(accumulator >> accumulator_to_word_shift);
-        buffer_index += 1;
+        push_word(Word::truncate_from_u32(accumulator >> accumulator_to_word_shift));
     }
 
-    buffer_index
+    unsafe { ptr.offset_from(start_ptr) as usize }
 }
 
 /// WS2812 LED driver with customizable SPI word size and bit encoding
@@ -201,5 +212,14 @@ mod tests {
         assert_eq!(buffer[7], 0b00_100_110);
         assert_eq!(buffer[8], 0b0_100_1100);
         assert_eq!(buffer[9], 0b1100_0000);  // LSbit padded
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_buffer_overflow_4bit() {
+        let lut = SmartLedsSpiLut::<u16,16>::new(0b100, 3, 0b1100, 4);
+        let rgb = [RGB8 { r: 0b00_00_00_00, g: 0b00_00_00_00, b: 0b00_10_10_11 }];
+        let mut buffer = [0u8; 9];
+        write_buffer(&lut, rgb, &mut buffer);
     }
 }
