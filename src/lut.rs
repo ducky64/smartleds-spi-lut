@@ -6,7 +6,7 @@ pub trait SmartLedsSpiData {
 
     /// Given BITS of smartled bits, return the corresponding SPI word and number of SPI bits
     /// Data is MSbit aligned
-    fn get(&self, value: usize) -> (u32, usize);
+    fn get(&self, value: u32) -> (u32, u8);
 }
 
 
@@ -33,11 +33,11 @@ impl SmartLedsSpiBit {
 impl SmartLedsSpiData for SmartLedsSpiBit {
   const INDEX_BITS: usize = 1;
 
-  fn get(&self, value: usize) -> (u32, usize) {
+  fn get(&self, value: u32) -> (u32, u8) {
       if value & 0x01 == 0 {
-          ((self.zero as u32) << 24, self.zero_bits as usize)
+          ((self.zero as u32) << 24, self.zero_bits)
       } else {
-          ((self.one as u32) << 24, self.one_bits as usize)
+          ((self.one as u32) << 24, self.one_bits)
       }
   }
 }
@@ -51,7 +51,7 @@ pub struct SmartLedsSpiLut<T, const N: usize>
 
 impl <T, const N: usize> SmartLedsSpiLut<T, N>
 {
-    const INDEX_MASK : usize = N - 1;
+    const INDEX_MASK : u32 = (N - 1) as u32;
 }
 
 macro_rules! impl_lut_table {
@@ -93,9 +93,9 @@ where T: Copy + WordOps + NumBits
 {
     const INDEX_BITS: usize = N.ilog2() as usize;
 
-    fn get(&self, value: usize) -> (u32, usize) {
-        let index = value & Self::INDEX_MASK;
-        (self.table[index].to_u32() << (32 - T::BITS), self.bits[index] as usize)
+    fn get(&self, value: u32) -> (u32, u8) {
+        let index = (value & Self::INDEX_MASK) as usize;
+        (self.table[index].to_u32() << (32 - T::BITS), self.bits[index])
   }
 }
 

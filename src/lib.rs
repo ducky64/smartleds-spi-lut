@@ -47,12 +47,12 @@ where
         let mut color_data = (item.g as u32) << 16 | (item.r as u32) << 8 | (item.b as u32);
 
         for _ in 0..(24 / Lut::INDEX_BITS) {
-            let lut_index = (color_data >> (24 - Lut::INDEX_BITS)) as usize;
+            let lut_index = color_data >> (24 - Lut::INDEX_BITS);
             let (spi_data, spi_bits) = lut.get(lut_index);
             color_data = color_data << Lut::INDEX_BITS;  // shift to get the next bits to the MSbits
 
             accumulator = accumulator | (spi_data >> accumulator_bits);
-            accumulator_bits += spi_bits;
+            accumulator_bits += spi_bits as usize;
             while accumulator_bits >= Word::BITS as usize {
                 push_word(Word::truncate_from_u32(accumulator >> accumulator_to_word_shift));
                 accumulator = accumulator << Word::BITS;
