@@ -2,11 +2,11 @@ use crate::bits_traits::{WordOps, NumBits};
 
 
 pub trait SmartLedsSpiData {
-    const INDEX_BITS: u8;  // number of bits this table indexes by
+    const INDEX_BITS: usize;  // number of bits this table indexes by
 
     /// Given BITS of smartled bits, return the corresponding SPI word and number of SPI bits
     /// Data is MSbit aligned
-    fn get(&self, value: u8) -> (u32, u8);
+    fn get(&self, value: usize) -> (u32, usize);
 }
 
 
@@ -31,13 +31,13 @@ impl SmartLedsSpiBit {
 }
 
 impl SmartLedsSpiData for SmartLedsSpiBit {
-  const INDEX_BITS: u8 = 1;
+  const INDEX_BITS: usize = 1;
 
-  fn get(&self, value: u8) -> (u32, u8) {
+  fn get(&self, value: usize) -> (u32, usize) {
       if value & 0x01 == 0 {
-          ((self.zero as u32) << 24, self.zero_bits)
+          ((self.zero as u32) << 24, self.zero_bits as usize)
       } else {
-          ((self.one as u32) << 24, self.one_bits)
+          ((self.one as u32) << 24, self.one_bits as usize)
       }
   }
 }
@@ -51,7 +51,7 @@ pub struct SmartLedsSpiLut<T, const N: usize>
 
 impl <T, const N: usize> SmartLedsSpiLut<T, N>
 {
-    const INDEX_MASK : u8 = (N - 1) as u8;
+    const INDEX_MASK : usize = N - 1;
 }
 
 macro_rules! impl_lut_table {
@@ -91,11 +91,11 @@ macro_rules! impl_lut_table {
 impl <T, const N: usize> SmartLedsSpiData for SmartLedsSpiLut<T, N> 
 where T: Copy + WordOps + NumBits
 {
-    const INDEX_BITS: u8 = N.ilog2() as u8;
+    const INDEX_BITS: usize = N.ilog2() as usize;
 
-    fn get(&self, value: u8) -> (u32, u8) {
-        let index = (value & Self::INDEX_MASK) as usize;
-        (self.table[index].to_u32() << (32 - T::BITS), self.bits[index])
+    fn get(&self, value: usize) -> (u32, usize) {
+        let index = value & Self::INDEX_MASK;
+        (self.table[index].to_u32() << (32 - T::BITS), self.bits[index] as usize)
   }
 }
 
