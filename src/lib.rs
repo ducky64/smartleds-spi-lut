@@ -12,7 +12,6 @@ use smart_leds_trait::{SmartLedsWriteAsync, RGB8};
 
 
 /// Write the colors to SPI bits in a buffer for transmission, returning the number of words.
-#[inline(never)]
 fn write_buffer<Word, Lut, T, I>(lut: &Lut, iterator: T, buffer: &mut [Word]) -> usize 
 where
     Lut: SmartLedsSpiData,
@@ -32,10 +31,8 @@ where
     let mut ptr = start_ptr;
 
     let mut push_word = |b: Word| {
-        if ptr >= end_ptr {
-            panic!("buffer overflow");
-        }
         unsafe {
+            assert!(ptr < end_ptr, "buffer overflow");
             ptr.write(b);
             ptr = ptr.add(1);
         }
