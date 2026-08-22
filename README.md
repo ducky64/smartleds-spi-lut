@@ -26,8 +26,12 @@ let spi = Spi::new_txonly_nosck::<0>(p.SPI1, p.PC6, p.DMA1_CH3, spi_config);
 // 16 entry lut = 4 bits at a time
 let mut colors = [RGB8 { r: 0, g: 0, b: 0 }; 11];
 let ws_lut = SmartLedsSpiLut::<u16, 16>::new(0b100, 3, 0b1100, 4);
-// 11 colors, u8 SPI word, maximum 4 SPI bytes per color channel (4 SPI bits per smartled bit)
+// 11 LEDs, u8 SPI word, maximum 4 SPI bytes per color channel (4 SPI bits per smartled bit)
 let mut ws = SmartLedsSpi::<u8, _, _, 11, 4>::new(spi, ws_lut);
 
 ws.write(colors.into_iter()).await.ok();
 ```
+
+## Config features
+
+`idle-first-bit`: prepend a low dummy bit as the first bit. `N` must be one more than the number of LEDs to size the buffer for the extra bit.
