@@ -34,4 +34,4 @@ ws.write(colors.into_iter()).await.ok();
 
 ## Config features
 
-`idle-first-bit`: prepend a low dummy bit as the first bit. `N` must be one more than the number of LEDs to size the buffer for the extra bit.
+`idle-first-bit`: prepend a low dummy bit as the first bit, to address first-bit timing issues on some SPI peripherals. `N` must be one more than the number of LEDs to size the buffer for the extra bit.
