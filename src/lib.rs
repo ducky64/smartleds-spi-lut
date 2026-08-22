@@ -39,7 +39,10 @@ where
     };
 
     let mut accumulator: u32 = 0;  // current SPI data being built, MSbit aligned
+    #[cfg(not(feature = "idle-first-bit"))]
     let mut accumulator_bits: usize = 0;  // number of bits written into accumulator
+    #[cfg(feature = "idle-first-bit")]
+    let mut accumulator_bits: usize = 1;  // initialize with dummy first bit
 
     for item in iterator {
         let item = item.into();
@@ -74,6 +77,7 @@ where
 
 /// WS2812 LED driver with customizable SPI word size and bit encoding
 /// N is the maximum number of LEDs in the chain, for buffer sizing
+///   When using idle-first-bit, N must be the number of LEDs + 1 for proper buffer sizing
 /// WORDS_PER_COLOR is the maximum number of SPI words used to encode a single color of LED data
 ///   This encoding is needed for internal array sizing without generic const exprs
 pub struct SmartLedsSpi<Word, Lut, SPI, const N: usize, const WORDS_PER_COLOR: usize> {
@@ -122,6 +126,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(not(feature = "idle-first-bit"))]
     fn test_buffer_zeros_2bit() {
         let lut = SmartLedsSpiLut::<u8, 4>::new(0b100, 3, 0b1100, 4);
         let rgb = [RGB8 { r: 0b00_00_00_00, g: 0b00_00_00_00, b: 0b00_00_00_00 }];
@@ -144,6 +149,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "idle-first-bit"))]
     fn test_buffer_zeros_4bit() {
         let lut = SmartLedsSpiLut::<u16,16>::new(0b100, 3, 0b1100, 4);
         let rgb = [RGB8 { r: 0b00_00_00_00, g: 0b00_00_00_00, b: 0b00_00_00_00 }];
@@ -166,6 +172,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "idle-first-bit"))]
     fn test_buffer_1bit() {
         let lut = SmartLedsSpiBit::new(0b100, 3, 0b1100, 4);
         let rgb = [RGB8 { r: 0b00_00_00_00, g: 0b00_00_00_00, b: 0b00_00_00_10 }];
@@ -189,6 +196,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "idle-first-bit"))]
     fn test_buffer_mixed_4bit() {
         let lut = SmartLedsSpiLut::<u16,16>::new(0b100, 3, 0b1100, 4);
         let rgb = [RGB8 { r: 0b00_00_00_00, g: 0b00_00_00_00, b: 0b00_10_10_11 }];
@@ -209,6 +217,30 @@ mod tests {
         assert_eq!(buffer[7], 0b00_100_110);
         assert_eq!(buffer[8], 0b0_100_1100);
         assert_eq!(buffer[9], 0b1100_0000);  // LSbit padded
+    }
+
+    #[test]
+    #[cfg(feature = "idle-first-bit")]
+    fn test_buffer_mixed_4bit_idlefirst() {
+        let lut = SmartLedsSpiLut::<u16,16>::new(0b100, 3, 0b1100, 4);
+        let rgb = [RGB8 { r: 0b00_00_00_00, g: 0b00_00_00_00, b: 0b00_10_10_11 }];
+        let mut buffer = [0u8; 12];
+        let words = write_buffer(&lut, rgb, &mut buffer);
+
+        assert_eq!(words, 10);
+
+        assert_eq!(buffer[0], 0b0_100_100_1);
+        assert_eq!(buffer[1], 0b00_100_100);
+        assert_eq!(buffer[2], 0b100_100_10);
+
+        assert_eq!(buffer[3], 0b0_100_100_1);
+        assert_eq!(buffer[4], 0b00_100_100);
+        assert_eq!(buffer[5], 0b100_100_10);
+
+        assert_eq!(buffer[6], 0b0_100_100_1);
+        assert_eq!(buffer[7], 0b100_100_11);
+        assert_eq!(buffer[8], 0b00_100_110);
+        assert_eq!(buffer[9], 0b01100_000);  // LSbit padded
     }
 
     #[test]
