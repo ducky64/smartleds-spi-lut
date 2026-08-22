@@ -233,9 +233,9 @@ mod tests {
         assert_eq!(buffer[1], 0b00_100_100);
         assert_eq!(buffer[2], 0b100_100_10);
 
-        assert_eq!(buffer[0], 0b0_100_100_1);
-        assert_eq!(buffer[1], 0b00_100_100);
-        assert_eq!(buffer[2], 0b100_100_10);
+        assert_eq!(buffer[3], 0b0_100_100_1);
+        assert_eq!(buffer[4], 0b00_100_100);
+        assert_eq!(buffer[5], 0b100_100_10);
 
         assert_eq!(buffer[6], 0b0_100_100_1);
         assert_eq!(buffer[7], 0b100_100_11);
