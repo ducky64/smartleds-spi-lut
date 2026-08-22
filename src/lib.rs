@@ -50,11 +50,15 @@ where
             let (spi_data, spi_bits) = lut.get(lut_index);
             color_data = color_data << Lut::INDEX_BITS;  // shift to get the next bits to the MSbits
 
-            accumulator = accumulator | (spi_data >> accumulator_bits);
+            accumulator |= spi_data >> accumulator_bits;
             accumulator_bits += spi_bits as usize;
             while accumulator_bits >= Word::BITS as usize {
                 push_word(Word::truncate_from_u32(accumulator >> accumulator_to_word_shift));
-                accumulator = accumulator << Word::BITS;
+                if Word::BITS < 32 {  // note, shift panics if shifting out whole word
+                    accumulator <<= Word::BITS;
+                } else {
+                    accumulator = 0;
+                }
                 accumulator_bits -= Word::BITS as usize;
             }
         }
@@ -89,10 +93,6 @@ where
     pub fn new(spi: SPI, lut: Lut) -> Self {
         Self { spi, lut, buffer: [[[Word::default(); WORDS_PER_COLOR]; 3]; N]}
     }
-
-    fn flat_buffer(buffer: &mut [[[Word; WORDS_PER_COLOR]; 3]; N]) -> &mut [Word] {
-        buffer.as_flattened_mut().as_flattened_mut()
-    }
 }
 
 impl <Word, Lut, SPI, const N: usize, const WORDS_PER_COLOR: usize> SmartLedsWriteAsync
@@ -110,7 +110,7 @@ where
         T: IntoIterator<Item = I>,
         I: Into<Self::Color>
     {
-        let buffer = Self::flat_buffer(&mut self.buffer);
+        let buffer = self.buffer.as_flattened_mut().as_flattened_mut();
         let buffer_size = write_buffer(&self.lut, iterator, buffer);
         self.spi.write(&buffer[0..buffer_size]).await
     }
